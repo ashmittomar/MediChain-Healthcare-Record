@@ -1,0 +1,9 @@
+Flask
+Werkzeug
+numpy
+pandas
+scikit-learn
+joblib
+cryptography
+web3
+py-solc-x

@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Secrets and environment variables
+.env
+.env.*
+!.env.example
+medichain.key
+*.pem
+*.key
+
+# Local databases
+medichain.db
+*.sqlite
+*.sqlite3
+instance/
+
+# Generated ML models
+# Keep trained models if required for deployment
+# models/*.joblib
+
+# Editor
+.vscode/
+.idea/
+
+# Operating system
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+
+# Testing and cache
+.pytest_cache/
+.mypy_cache/
+.coverage

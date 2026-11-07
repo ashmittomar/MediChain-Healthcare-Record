@@ -1,0 +1,1512 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#087f78">
+
+    <title>MediChain | Digital Healthcare</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+
+    {% set current_page = page|default('home') %}
+
+    <!-- =====================================================
+     FLASH MESSAGES
+===================================================== -->
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <div class="flash-container">
+        {% for category, message in messages %}
+        <div class="flash-message {{ category }}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+
+    <!-- =====================================================
+     PUBLIC LANDING PAGE
+===================================================== -->
+
+    {% if current_page == 'home' %}
+
+    <header class="public-header">
+        <a href="{{ url_for('index') }}" class="brand">
+            <span class="brand-icon">✚</span>
+            <span>Medi<span class="brand-accent">Chain</span></span>
+        </a>
+
+        <nav>
+            <a href="{{ url_for('index') }}">Home</a>
+            <a href="{{ url_for('login') }}">Sign in</a>
+            <a href="{{ url_for('register') }}" class="btn btn-primary">Get started</a>
+        </nav>
+    </header>
+
+    <main class="public-shell">
+
+        <section class="portal-top">
+            <div class="portal-intro">
+                <div class="eyebrow">DIGITAL HEALTHCARE PLATFORM</div>
+
+                <h1>
+                    Smarter health insights.
+                    <span>Secure medical records.</span>
+                </h1>
+
+                <p>
+                    MediChain combines machine learning and blockchain
+                    technology to demonstrate symptom assessment,
+                    encrypted medical records and record verification.
+                </p>
+
+                <div class="portal-actions">
+                    <a href="{{ url_for('register') }}" class="btn btn-primary">
+                        Create account →
+                    </a>
+
+                    <a href="{{ url_for('login') }}" class="btn btn-outline">
+                        Sign in
+                    </a>
+                </div>
+
+                <div class="portal-security">
+    <div>✓ Three machine learning models</div>
+    <div>✓ Encrypted consultation records</div>
+    <div>✓ Blockchain-backed record hashes</div>
+</div>
+            </div>
+
+            <div class="portal-preview">
+
+                <div class="preview-header">
+                    <div class="preview-brand">
+                        <span>✚</span> HEALTH OVERVIEW
+                    </div>
+
+                    <span class="preview-live">
+                        <i></i> MEDICHAIN
+                    </span>
+                </div>
+
+                <div class="preview-welcome">
+                    <div>
+                        <small>YOUR HEALTH WORKSPACE</small>
+                        <h3>Health at a glance</h3>
+                        <p>Your personal health records.</p>
+                    </div>
+
+                    <div class="preview-cross">✚</div>
+                </div>
+
+                <div class="preview-metrics">
+                    <div>
+                        <span class="metric-icon green">♥</span>
+                        <small>Symptom checker</small>
+                        <b>AI-assisted</b>
+                    </div>
+
+                    <div>
+                        <span class="metric-icon blue">▤</span>
+                        <small>Health records</small>
+                        <b>Encrypted</b>
+                    </div>
+
+                    <div>
+                        <span class="metric-icon violet">◇</span>
+                        <small>Blockchain</small>
+                        <b>Verifiable</b>
+                    </div>
+                </div>
+
+                <div class="preview-section-title">
+                    HEALTH ASSESSMENT
+                </div>
+
+                <div class="preview-check">
+                    <span class="preview-check-icon">✚</span>
+                    <div>
+                        <b>Symptom assessment</b>
+                        <small>Explore possible conditions</small>
+                    </div>
+                    <span class="preview-check-arrow">→</span>
+                </div>
+
+                <div class="preview-footer">
+                    <span>●</span>
+                    Privacy-focused healthcare technology
+                </div>
+            </div>
+
+        </section>
+
+        <section class="portal-feature-strip">
+            <div>
+                <span>01</span>
+                <b>Check your symptoms</b>
+                <p>Enter symptoms and health measurements.</p>
+            </div>
+
+            <div>
+                <span>02</span>
+                <b>Compare ML models</b>
+                <p>Compare Decision Tree, Random Forest and Extra Trees.</p>
+            </div>
+
+            <div>
+                <span>03</span>
+                <b>Keep verifiable records</b>
+                <p>Save encrypted records and verify their hashes.</p>
+            </div>
+        </section>
+
+        <section class="portal-info">
+            <div class="portal-info-visual">
+                <div class="privacy-visual-icon">◇</div>
+                <div class="privacy-visual-line"></div>
+
+                <div class="privacy-visual-bottom">
+                    <span>▣ Encrypted information</span>
+                    <span>✓ Blockchain hash</span>
+                </div>
+            </div>
+
+            <div class="portal-info-copy">
+                <div class="eyebrow">PRIVACY BY DESIGN</div>
+
+                <h2>
+                    Your information stays private.
+                    Your records stay verifiable.
+                </h2>
+
+                <p>
+                    Medical details are encrypted before storage.
+                    A cryptographic hash is recorded on the blockchain
+                    to help identify changes to a saved record.
+                </p>
+
+                <a href="{{ url_for('register') }}" class="text-link">
+                    Create your personal account →
+                </a>
+            </div>
+        </section>
+
+        <div class="medical-notice">
+            <b>Medical disclaimer:</b>
+            MediChain is an academic demonstration, not a clinical
+            diagnostic service. Model predictions must not replace
+            professional medical advice.
+        </div>
+
+    </main>
+
+
+    <!-- =====================================================
+     LOGIN AND REGISTRATION
+===================================================== -->
+
+    {% elif current_page in ['register', 'login'] %}
+
+    <header class="public-header">
+        <a href="{{ url_for('index') }}" class="brand">
+            <span class="brand-icon">✚</span>
+            <span>Medi<span class="brand-accent">Chain</span></span>
+        </a>
+
+        <nav>
+            <a href="{{ url_for('index') }}">Home</a>
+            <a href="{{ url_for('login') }}">Sign in</a>
+            <a href="{{ url_for('register') }}" class="btn btn-primary">Get started</a>
+        </nav>
+    </header>
+
+    <section class="auth-layout">
+
+        <div class="auth-info">
+            <div class="eyebrow">MEDICHAIN HEALTH PORTAL</div>
+
+            <div class="auth-emblem">✚</div>
+
+            <h1>
+                {% if current_page == 'register' %}
+                Your health journey starts here.
+                {% else %}
+                Welcome back to your health space.
+                {% endif %}
+            </h1>
+
+            <p>
+                Manage symptom checks, consultation history and
+                blockchain-backed record verification in one
+                personal account.
+            </p>
+
+            <div class="auth-points">
+                <div>✓ Personal health dashboard</div>
+                <div>✓ Encrypted consultation records</div>
+                <div>✓ Blockchain verification</div>
+            </div>
+        </div>
+
+        <div class="auth-card">
+
+            <div class="eyebrow">
+                {% if current_page == 'register' %}
+                CREATE ACCOUNT
+                {% else %}
+                SECURE SIGN IN
+                {% endif %}
+            </div>
+
+            <h2>
+                {% if current_page == 'register' %}
+                Join MediChain
+                {% else %}
+                Sign in
+                {% endif %}
+            </h2>
+
+            <p>
+                {% if current_page == 'register' %}
+                Enter your details to get started.
+                {% else %}
+                Access your personal health dashboard.
+                {% endif %}
+            </p>
+
+            <form method="POST" action="{{ url_for(current_page) }}" class="auth-form">
+
+                {% if current_page == 'register' %}
+
+                <label>
+                    Full name
+                    <input type="text" name="name" required autocomplete="name" placeholder="Your full name">
+                </label>
+
+                <label>
+                    Email address
+                    <input type="email" name="email" required autocomplete="email" placeholder="name@example.com">
+                </label>
+
+                {% endif %}
+
+                <label>
+                    Username
+                    <input type="text" name="username" required autocomplete="username" placeholder="Your username">
+                </label>
+
+                <label>
+                    Password
+                    <input type="password" name="password" required minlength="8"
+                        autocomplete="{% if current_page == 'register' %}new-password{% else %}current-password{% endif %}"
+                        placeholder="Enter password">
+                </label>
+
+                <button type="submit" class="btn btn-primary full">
+                    {% if current_page == 'register' %}
+                    Create account →
+                    {% else %}
+                    Sign in →
+                    {% endif %}
+                </button>
+            </form>
+
+            <div class="auth-switch">
+                {% if current_page == 'register' %}
+                Already registered?
+                <a href="{{ url_for('login') }}">Sign in</a>
+                {% else %}
+                Don't have an account?
+                <a href="{{ url_for('register') }}">Create one</a>
+                {% endif %}
+            </div>
+
+        </div>
+    </section>
+
+
+    <!-- =====================================================
+     AUTHENTICATED APPLICATION SHELL
+===================================================== -->
+
+    {% else %}
+
+    <div class="app-shell">
+
+        <aside class="sidebar">
+
+            <a class="brand" href="{{ url_for('dashboard') }}">
+                <span class="brand-icon">✚</span>
+                <span>Medi<span class="brand-accent">Chain</span></span>
+            </a>
+
+            <div class="nav-caption">PERSONAL WORKSPACE</div>
+
+            <nav class="sidebar-nav">
+
+                <a href="{{ url_for('dashboard') }}" class="{{ 'active' if current_page == 'dashboard' else '' }}">
+                    <span>▦</span> Overview
+                </a>
+
+                <a href="{{ url_for('symptom_checker') }}"
+                    class="{{ 'active' if current_page in ['symptom_checker', 'result'] else '' }}">
+                    <span>✚</span> Symptom checker
+                </a>
+
+                <a href="{{ url_for('history') }}"
+                    class="{{ 'active' if current_page in ['history', 'detail', 'verify'] else '' }}">
+                    <span>▤</span> My health records
+                </a>
+
+                <a href="{{ url_for('blockchain') }}" class="{{ 'active' if current_page == 'blockchain' else '' }}">
+                    <span>◇</span> Blockchain status
+                </a>
+
+            </nav>
+
+            <div class="sidebar-bottom">
+                <div class="sidebar-health-card">
+                    <span>♥</span>
+                    <b>Your health matters</b>
+                    <p>
+                        Track consultations and keep your
+                        medical information organised.
+                    </p>
+                </div>
+
+                <a href="{{ url_for('logout') }}" class="logout-link">
+                    ↪ &nbsp; Sign out
+                </a>
+            </div>
+
+        </aside>
+
+
+        <div class="app-main">
+
+            <header class="app-topbar">
+                <div class="breadcrumb">
+                    <span>MEDICHAIN</span>
+                    <b>/</b>
+
+                    {% if current_page == 'dashboard' %}
+                    Overview
+                    {% elif current_page in ['symptom_checker', 'result'] %}
+                    Symptom checker
+                    {% elif current_page == 'history' %}
+                    Health records
+                    {% elif current_page == 'detail' %}
+                    Record details
+                    {% elif current_page == 'verify' %}
+                    Verification
+                    {% elif current_page == 'blockchain' %}
+                    Blockchain status
+                    {% endif %}
+                </div>
+
+                <div class="topbar-user">
+                    <span class="avatar">
+                        {{ session.get('name', 'U')[:1]|upper }}
+                    </span>
+
+                    <div>
+                        <b>{{ session.get('name', 'User')|upper }}</b>
+                        <small>Personal account</small>
+                    </div>
+                </div>
+            </header>
+
+
+            <main class="app-content">
+
+
+                <!-- =================================================
+             DASHBOARD
+        ================================================== -->
+
+                {% if current_page == 'dashboard' %}
+
+                <section class="page-header dashboard-header">
+                    <div>
+                        <div class="eyebrow">YOUR PERSONAL HEALTH SPACE</div>
+                        <h1>Hello, {{ session.get('name', 'User').split(' ')[0] }}.</h1>
+                        <p>Welcome to your healthcare dashboard.</p>
+                    </div>
+                </section>
+
+                <section class="dashboard-hero">
+                    <div>
+                        <small>PERSONAL HEALTH ASSESSMENT</small>
+                        <h2>How are you feeling today?</h2>
+                        <p>
+                            Enter symptoms and explore possible health
+                            conditions using three machine learning models.
+                        </p>
+
+                        <a href="{{ url_for('symptom_checker') }}" class="btn btn-white">
+                            Start symptom assessment →
+                        </a>
+                    </div>
+
+                    <div class="dashboard-hero-art">✚</div>
+                </section>
+
+                <section class="stat-grid">
+
+                    <div class="stat-card">
+                        <div class="stat-symbol green">♥</div>
+                        <div>
+                            <small>Health consultations</small>
+                            <strong>{{ total_consultations }}</strong>
+                            <p>Total saved consultations</p>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-symbol blue">▤</div>
+                        <div>
+                            <small>Medical records</small>
+                            <strong>{{ total_consultations }}</strong>
+                            <p>Encrypted records</p>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-symbol purple">◇</div>
+                        <div>
+                            <small>ML models</small>
+                            <strong>3</strong>
+                            <p>Decision Tree, Random Forest, Extra Trees</p>
+                        </div>
+                    </div>
+
+                </section>
+
+
+                <!-- MODEL PERFORMANCE DASHBOARD -->
+
+                <section class="form-card model-dashboard">
+
+                    <div class="section-title">
+                        <div>
+                            <div class="eyebrow">MACHINE LEARNING ANALYTICS</div>
+                            <h2>Model performance comparison</h2>
+                            <p>
+                                Evaluation on the held-out test dataset.
+                            </p>
+                        </div>
+                    </div>
+
+                    {% if model_error %}
+                    <div class="medical-notice">
+                        Model metrics are not available:
+                        {{ model_error }}
+                    </div>
+                    {% elif comparison %}
+
+                    <div class="best-model-banner">
+                        <span>★</span>
+                        <div>
+                            <small>BEST MODEL BY VALIDATION MACRO F1</small>
+                            <b>{{ best_model_name }}</b>
+                        </div>
+                    </div>
+
+                    <div class="chart-container">
+                        <canvas id="dashboardModelChart"></canvas>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Model</th>
+                                    <th>Accuracy</th>
+                                    <th>Precision</th>
+                                    <th>Recall</th>
+                                    <th>Macro F1</th>
+                                    <th>Balanced accuracy</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {% for item in comparison %}
+                                <tr>
+                                    <td><b>{{ item.model }}</b></td>
+                                    <td>{{ "%.2f"|format(item.accuracy) }}%</td>
+                                    <td>{{ "%.2f"|format(item.precision) }}%</td>
+                                    <td>{{ "%.2f"|format(item.recall) }}%</td>
+                                    <td>{{ "%.2f"|format(item.f1_score) }}%</td>
+                                    <td>{{ "%.2f"|format(item.balanced_accuracy) }}%</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {% else %}
+                    <div class="empty-state">
+                        <h3>Model metrics unavailable</h3>
+                        <p>Check that your dataset is available and correctly formatted.</p>
+                    </div>
+                    {% endif %}
+
+                </section>
+
+
+                <!-- RECENT CONSULTATIONS -->
+
+                <div class="section-title">
+                    <div>
+                        <div class="eyebrow">YOUR ACTIVITY</div>
+                        <h2>Recent consultations</h2>
+                    </div>
+
+                    <a href="{{ url_for('history') }}">View all →</a>
+                </div>
+
+                {% if recent_consultations %}
+
+                <div class="records-list">
+                    {% for record in recent_consultations %}
+                    <a class="record-item"
+                        href="{{ url_for('consultation_detail', consultation_id=record.consultation_id) }}">
+
+                        <div class="record-symbol">✚</div>
+
+                        <div class="record-text">
+                            <b>{{ record.prediction }}</b>
+                            <small>{{ record.created_at }}</small>
+                        </div>
+
+                        <span class="record-status">Saved</span>
+                        <span class="record-arrow">→</span>
+                    </a>
+                    {% endfor %}
+                </div>
+
+                {% else %}
+
+                <div class="empty-state">
+                    <span>▤</span>
+                    <h3>No consultations yet</h3>
+                    <p>Your saved consultations will appear here.</p>
+
+                    <a href="{{ url_for('symptom_checker') }}" class="btn btn-primary">
+                        Start your first assessment →
+                    </a>
+                </div>
+
+                {% endif %}
+
+
+                <!-- =================================================
+             SYMPTOM CHECKER
+        ================================================== -->
+
+                {% elif current_page == 'symptom_checker' %}
+
+                <section class="page-header">
+                    <div class="eyebrow">AI-ASSISTED HEALTH ASSESSMENT</div>
+                    <h1>Symptom checker</h1>
+                    <p>
+                        Enter your basic information, symptoms and optional
+                        health measurements.
+                    </p>
+                </section>
+
+                <div class="medical-notice">
+                    <b>Important:</b>
+                    This tool provides educational predictions only.
+                    It does not diagnose diseases or replace a medical professional.
+                </div>
+
+                <form method="POST" action="{{ url_for('symptom_checker') }}" class="assessment-form">
+
+                    <section class="form-card">
+                        <div class="form-card-heading">
+                            <span>01</span>
+                            <div>
+                                <h2>Personal information</h2>
+                                <p>Provide your basic details.</p>
+                            </div>
+                        </div>
+
+                        <div class="field-grid">
+                            <label>
+                                Age
+                                <input type="number" name="age" min="1" max="110" required placeholder="Enter your age">
+                            </label>
+
+                            <label>
+                                Gender
+                                <select name="gender" required>
+                                    <option value="">Select gender</option>
+                                    <option value="Male">Male</option>
+                                    <option value="Female">Female</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </label>
+                        </div>
+                    </section>
+
+
+                    <section class="form-card">
+                        <div class="form-card-heading">
+                            <span>02</span>
+                            <div>
+                                <h2>Symptoms</h2>
+                                <p>Select the severity of each symptom.</p>
+                            </div>
+                        </div>
+
+                        <div class="severity-guide">
+                            <span><b>0</b> None</span>
+                            <span><b>1</b> Mild</span>
+                            <span><b>2</b> Moderate</span>
+                            <span><b>3</b> Severe</span>
+                        </div>
+
+                        <div class="symptom-grid">
+                            {% for key, label in symptoms.items() %}
+                            <label class="symptom-field">
+                                <span>{{ label }}</span>
+                                <select name="{{ key }}" required>
+                                    <option value="0">0 - None</option>
+                                    <option value="1">1 - Mild</option>
+                                    <option value="2">2 - Moderate</option>
+                                    <option value="3">3 - Severe</option>
+                                </select>
+                            </label>
+                            {% endfor %}
+                        </div>
+                    </section>
+
+
+                    <section class="form-card">
+                        <div class="form-card-heading">
+                            <span>03</span>
+                            <div>
+                                <h2>Health measurements</h2>
+                                <p>Optional. Leave blank if unknown.</p>
+                            </div>
+                        </div>
+
+                        <div class="field-grid">
+
+                            <label>
+                                Heart rate
+                                <span class="input-hint">Beats per minute (40–180)</span>
+                                <input type="number" name="heart_rate" min="40" max="180" step="1"
+                                    placeholder="e.g. 75">
+                            </label>
+
+                            <label>
+                                Body temperature
+                                <span class="input-hint">Degrees Celsius (35–41)</span>
+                                <input type="number" name="temperature_c" min="35" max="41" step="0.1"
+                                    placeholder="e.g. 37.0">
+                            </label>
+
+                            <label>
+                                Oxygen saturation
+                                <span class="input-hint">SpO₂ percentage (70–100)</span>
+                                <input type="number" name="oxygen_saturation" min="70" max="100" step="1"
+                                    placeholder="e.g. 98">
+                            </label>
+
+                            <label>
+                                Systolic blood pressure
+                                <span class="input-hint">mmHg (80–200)</span>
+                                <input type="number" name="systolic_bp" min="80" max="200" step="1"
+                                    placeholder="e.g. 120">
+                            </label>
+
+                            <label>
+                                Diastolic blood pressure
+                                <span class="input-hint">mmHg (40–130)</span>
+                                <input type="number" name="diastolic_bp" min="40" max="130" step="1"
+                                    placeholder="e.g. 80">
+                            </label>
+
+                        </div>
+                    </section>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">
+                            Analyse symptoms →
+                        </button>
+
+                        <a href="{{ url_for('dashboard') }}" class="btn btn-outline">
+                            Cancel
+                        </a>
+                    </div>
+
+                </form>
+
+
+                <!-- =================================================
+             PREDICTION RESULT PAGE
+        ================================================== -->
+
+                {% elif current_page == 'result' %}
+
+                <section class="page-header">
+                    <div class="eyebrow">ASSESSMENT COMPLETED</div>
+                    <h1>Prediction results</h1>
+                    <p>
+                        Results from three machine learning models
+                        using your submitted information.
+                    </p>
+                </section>
+
+                <div class="medical-notice">
+                    <b>Medical disclaimer:</b>
+                    These are educational model outputs, not confirmed diagnoses.
+                    Model scores are not clinical probabilities.
+                </div>
+
+                <section class="form-card">
+
+                    <div class="section-title">
+                        <div>
+                            <div class="eyebrow">SELECTED MODEL</div>
+                            <h2>{{ model_name }}</h2>
+                            <p>
+                                Selected using validation macro F1.
+                                Held-out test accuracy:
+                                {{ "%.2f"|format(accuracy) }}%.
+                            </p>
+                        </div>
+                    </div>
+
+                    <h3>Top predictions from the selected model</h3>
+
+                    <div class="prediction-list">
+                        {% for prediction in predictions %}
+                        <div class="prediction-card">
+                            <div class="prediction-rank">{{ loop.index }}</div>
+
+                            <h3>{{ prediction.disease }}</h3>
+
+                            <p>
+                                Model score:
+                                <strong>{{ "%.2f"|format(prediction.score) }}%</strong>
+                            </p>
+
+                            <div class="confidence-bar">
+                                <div class="confidence-fill" style="width: {{ prediction.score }}%;">
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                </section>
+
+
+                <!-- EACH MODEL'S PREDICTIONS -->
+
+                <section class="form-card">
+                    <div class="eyebrow">INDIVIDUAL MODEL OUTPUTS</div>
+                    <h2>What each model predicted</h2>
+
+                    <div class="model-prediction-grid">
+
+                        {% for model, model_predictions in all_predictions.items() %}
+                        <div class="prediction-card">
+
+                            <h3>{{ model }}</h3>
+
+                            {% if model == model_name %}
+                            <span class="record-status">Best selected model</span>
+                            {% endif %}
+
+                            {% for prediction in model_predictions %}
+                            <div class="model-prediction-row">
+                                <span>
+                                    {{ loop.index }}. {{ prediction.disease }}
+                                </span>
+                                <b>{{ "%.2f"|format(prediction.score) }}%</b>
+                            </div>
+
+                            <div class="confidence-bar">
+                                <div class="confidence-fill" style="width: {{ prediction.score }}%;">
+                                </div>
+                            </div>
+                            {% endfor %}
+
+                        </div>
+                        {% endfor %}
+
+                    </div>
+                </section>
+
+
+                <!-- MODEL PERFORMANCE -->
+
+                <section class="form-card">
+                    <div class="eyebrow">MODEL EVALUATION</div>
+                    <h2>Performance comparison</h2>
+                    <p>
+                        These metrics are calculated on the held-out test dataset.
+                    </p>
+
+                    <div class="chart-container">
+                        <canvas id="resultModelChart"></canvas>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Model</th>
+                                    <th>Accuracy</th>
+                                    <th>Precision</th>
+                                    <th>Recall</th>
+                                    <th>Macro F1</th>
+                                    <th>Balanced accuracy</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {% for item in comparison %}
+                                <tr>
+                                    <td><b>{{ item.model }}</b></td>
+                                    <td>{{ "%.2f"|format(item.accuracy) }}%</td>
+                                    <td>{{ "%.2f"|format(item.precision) }}%</td>
+                                    <td>{{ "%.2f"|format(item.recall) }}%</td>
+                                    <td>{{ "%.2f"|format(item.f1_score) }}%</td>
+                                    <td>{{ "%.2f"|format(item.balanced_accuracy) }}%</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+
+                <!-- EVALUATION DETAIL -->
+
+                <section class="form-card">
+                    <div class="eyebrow">SELECTED MODEL TEST RESULTS</div>
+                    <h2>{{ model_name }} evaluation</h2>
+
+                    <div class="evaluation-grid">
+                        <div class="evaluation-card">
+                            <small>Accuracy</small>
+                            <strong>{{ "%.2f"|format(evaluation.accuracy) }}%</strong>
+                        </div>
+
+                        <div class="evaluation-card">
+                            <small>Macro precision</small>
+                            <strong>{{ "%.2f"|format(evaluation.precision) }}%</strong>
+                        </div>
+
+                        <div class="evaluation-card">
+                            <small>Macro recall</small>
+                            <strong>{{ "%.2f"|format(evaluation.recall) }}%</strong>
+                        </div>
+
+                        <div class="evaluation-card">
+                            <small>Macro F1</small>
+                            <strong>{{ "%.2f"|format(evaluation.f1_score) }}%</strong>
+                        </div>
+
+                        <div class="evaluation-card">
+                            <small>Balanced accuracy</small>
+                            <strong>{{ "%.2f"|format(evaluation.balanced_accuracy) }}%</strong>
+                        </div>
+
+                    </div>
+                </section>
+
+
+                <!-- BLOCKCHAIN RECEIPT -->
+
+                <section class="blockchain-confirmation">
+                    <div class="confirmation-icon">✓</div>
+                    <div>
+                        <b>Consultation saved successfully</b>
+                        <p>
+                            The encrypted record has been stored and its
+                            hash has been submitted to the blockchain.
+                        </p>
+                    </div>
+                </section>
+
+                <section class="form-card record-meta">
+                    <p>
+                        <b>Consultation ID:</b>
+                        <span>{{ consultation_id }}</span>
+                    </p>
+
+                    <p>
+                        <b>Record hash:</b>
+                        <span>{{ record_hash }}</span>
+                    </p>
+
+                    <p>
+                        <b>Blockchain transaction:</b>
+                        <span>{{ blockchain_tx }}</span>
+                    </p>
+                </section>
+
+                <a href="{{ url_for('history') }}" class="btn btn-primary">
+                    View my health records →
+                </a>
+
+
+                <!-- =================================================
+             HISTORY
+        ================================================== -->
+
+                {% elif current_page == 'history' %}
+
+                <section class="page-header">
+                    <div class="eyebrow">PERSONAL MEDICAL RECORDS</div>
+                    <h1>My health records</h1>
+                    <p>
+                        View previous consultations and verify
+                        their blockchain records.
+                    </p>
+                </section>
+
+                {% if consultations %}
+
+                <div class="records-list">
+
+                    {% for record in consultations %}
+                    <div class="record-item">
+
+                        <div class="record-symbol">✚</div>
+
+                        <div class="record-text">
+                            <b>{{ record.prediction }}</b>
+                            <small>{{ record.created_at }}</small>
+                            <small>
+                                Consultation ID: {{ record.consultation_id }}
+                            </small>
+                        </div>
+
+                        <a class="record-action"
+                            href="{{ url_for('consultation_detail', consultation_id=record.consultation_id) }}">
+                            Details
+                        </a>
+
+                        <a class="record-action secondary"
+                            href="{{ url_for('verify_record', consultation_id=record.consultation_id) }}">
+                            Verify
+                        </a>
+
+                    </div>
+                    {% endfor %}
+
+                </div>
+
+                {% else %}
+
+                <div class="empty-state">
+                    <span>▤</span>
+                    <h3>No health records found</h3>
+                    <p>Complete a symptom assessment to create your first record.</p>
+
+                    <a href="{{ url_for('symptom_checker') }}" class="btn btn-primary">
+                        Start assessment →
+                    </a>
+                </div>
+
+                {% endif %}
+
+
+                <!-- =================================================
+             CONSULTATION DETAILS
+        ================================================== -->
+
+                {% elif current_page == 'detail' %}
+
+                <section class="page-header">
+                    <div class="eyebrow">CONSULTATION INFORMATION</div>
+                    <h1>Record details</h1>
+                    <p>View the details of your saved consultation.</p>
+                </section>
+
+                {% if consultation and medical_record %}
+
+                <section class="form-card">
+
+                    <div class="section-title">
+                        <h2>Consultation summary</h2>
+
+                        {% if local_integrity %}
+                        <span class="record-status">Local hash matches</span>
+                        {% else %}
+                        <span class="record-status danger">Hash mismatch</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="record-meta">
+                        <p>
+                            <b>Consultation ID:</b>
+                            <span>{{ consultation.consultation_id }}</span>
+                        </p>
+
+                        <p>
+                            <b>Date:</b>
+                            <span>{{ consultation.created_at }}</span>
+                        </p>
+
+                        <p>
+                            <b>Predicted disease:</b>
+                            <span>{{ consultation.prediction }}</span>
+                        </p>
+
+                        <p>
+                            <b>Selected model:</b>
+                            <span>{{ medical_record.get('model_name', 'Not available') }}</span>
+                        </p>
+
+                        <p>
+                            <b>Model test accuracy:</b>
+                            <span>{{ "%.2f"|format(consultation.model_accuracy or 0) }}%</span>
+                        </p>
+
+                        <p>
+                            <b>Record hash:</b>
+                            <span>{{ consultation.record_hash }}</span>
+                        </p>
+
+                        <p>
+                            <b>Blockchain transaction:</b>
+                            <span>{{ consultation.blockchain_tx }}</span>
+                        </p>
+                    </div>
+
+                </section>
+
+
+                <section class="form-card">
+                    <h2>Personal information</h2>
+
+                    <div class="detail-grid">
+                        <div>
+                            <small>Age</small>
+                            <b>{{ medical_record.get('input', {}).get('age', '—') }}</b>
+                        </div>
+
+                        <div>
+                            <small>Gender</small>
+                            <b>{{ medical_record.get('input', {}).get('gender', '—') }}</b>
+                        </div>
+                    </div>
+                </section>
+
+
+                <section class="form-card">
+                    <h2>Recorded symptoms and measurements</h2>
+
+                    <div class="detail-grid">
+                        {% for key, value in medical_record.get('input', {}).items() %}
+                        {% if key not in ['age', 'gender'] %}
+                        <div>
+                            <small>{{ key.replace('_', ' ')|title }}</small>
+                            <b>{{ value if value is not none else 'Not provided' }}</b>
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </section>
+
+
+                <section class="form-card">
+                    <h2>Predictions from all models</h2>
+
+                    {% set saved_predictions = medical_record.get('all_predictions', {}) %}
+
+                    {% if saved_predictions %}
+                    <div class="model-prediction-grid">
+                        {% for model, items in saved_predictions.items() %}
+                        <div class="prediction-card">
+                            <h3>{{ model }}</h3>
+
+                            {% for item in items %}
+                            <div class="model-prediction-row">
+                                <span>{{ loop.index }}. {{ item.disease }}</span>
+                                <b>{{ "%.2f"|format(item.score) }}%</b>
+                            </div>
+
+                            <div class="confidence-bar">
+                                <div class="confidence-fill" style="width: {{ item.score }}%;">
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <p>
+                        This is an older consultation. Individual model
+                        predictions were not stored when it was created.
+                    </p>
+
+                    <div class="prediction-list">
+                        {% for item in medical_record.get('predictions', []) %}
+                        <div class="prediction-card">
+                            <h3>{{ item.get('disease', 'Prediction') }}</h3>
+                            <p>
+                                Model score:
+                                {{ "%.2f"|format(item.get('score', 0)) }}%
+                            </p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </section>
+
+
+                <section class="form-card">
+                    <h2>Record integrity status</h2>
+
+                    <div class="evaluation-grid">
+                        <div class="evaluation-card">
+                            <small>Local record hash</small>
+                            <strong>
+                                {{ 'MATCH' if local_integrity else 'MISMATCH' }}
+                            </strong>
+                        </div>
+
+                        <div class="evaluation-card">
+                            <small>Blockchain record</small>
+                            <strong>
+                                {{ 'VERIFIED' if blockchain_verified else 'NOT VERIFIED' }}
+                            </strong>
+                        </div>
+                    </div>
+
+                    <a href="{{ url_for('verify_record', consultation_id=consultation.consultation_id) }}"
+                        class="btn btn-primary">
+                        Open verification page →
+                    </a>
+                </section>
+
+                {% endif %}
+
+
+                <!-- =================================================
+             BLOCKCHAIN VERIFICATION
+        ================================================== -->
+
+                {% elif current_page == 'verify' %}
+
+                <section class="page-header">
+                    <div class="eyebrow">RECORD AUTHENTICITY</div>
+                    <h1>Blockchain verification</h1>
+                    <p>
+                        Check whether the stored consultation hash
+                        matches the blockchain record.
+                    </p>
+                </section>
+
+
+                <section class="verification-card">
+
+                    {% if verified %}
+
+                    <div class="verification-icon success">✓</div>
+                    <h2>Verification successful</h2>
+                    <p>
+                        The local record hash matches the hash
+                        registered on the current blockchain.
+                    </p>
+                    <span class="status-pill success">Verified</span>
+
+                    {% else %}
+
+                    <div class="verification-icon error">!</div>
+                    <h2>Verification unsuccessful</h2>
+                    <p>
+                        The record could not be confirmed against
+                        the current blockchain.
+                    </p>
+                    <span class="status-pill error">Not verified</span>
+
+                    {% endif %}
+
+                </section>
+
+
+                <section class="form-card">
+                    <h2>Verification information</h2>
+
+                    <div class="record-meta">
+                        <p>
+                            <b>Consultation ID:</b>
+                            <span>{{ consultation.consultation_id }}</span>
+                        </p>
+
+                        <p>
+                            <b>Stored record hash:</b>
+                            <span>{{ consultation.record_hash }}</span>
+                        </p>
+
+                        <p>
+                            <b>Blockchain transaction:</b>
+                            <span>{{ consultation.blockchain_tx }}</span>
+                        </p>
+
+                        <p>
+                            <b>Local integrity:</b>
+                            <span>
+                                {% if local_integrity %}
+                                Match
+                                {% elif local_integrity == false %}
+                                Mismatch or unreadable
+                                {% else %}
+                                Not checked
+                                {% endif %}
+                            </span>
+                        </p>
+
+                        <p>
+                            <b>Current blockchain result:</b>
+                            <span>
+                                {{ 'Verified' if blockchain_verified else 'Not verified' }}
+                            </span>
+                        </p>
+                    </div>
+                </section>
+
+
+                {% if not verified and local_integrity %}
+
+                <section class="form-card">
+                    <div class="eyebrow">GANACHE RECOVERY</div>
+                    <h2>Register this record on the current chain</h2>
+
+                    <p>
+                        Use this only if Ganache was reset or the old contract
+                        was lost. This creates a new blockchain transaction
+                        for the existing database record. It does not restore
+                        the original transaction.
+                    </p>
+
+                    <form method="POST"
+                        action="{{ url_for('verify_record', consultation_id=consultation.consultation_id) }}"
+                        onsubmit="return confirm('Register this existing record hash on the current Ganache blockchain? This creates a new transaction.');">
+
+                        <button type="submit" class="btn btn-primary">
+                            Re-register record hash →
+                        </button>
+                    </form>
+                </section>
+
+                {% endif %}
+
+
+                {% if error_message %}
+                <div class="medical-notice">
+                    {{ error_message }}
+                </div>
+                {% endif %}
+
+                <a href="{{ url_for('history') }}" class="btn btn-primary">
+                    Back to records
+                </a>
+
+
+                <!-- =================================================
+             BLOCKCHAIN STATUS
+        ================================================== -->
+
+                {% elif current_page == 'blockchain' %}
+
+                <section class="page-header">
+                    <div class="eyebrow">NETWORK INFORMATION</div>
+                    <h1>Blockchain status</h1>
+                    <p>
+                        View the current Ganache connection and
+                        MediChain smart contract information.
+                    </p>
+                </section>
+
+
+                <section class="form-card">
+
+                    {% if blockchain_connected %}
+                    <div class="best-model-banner">
+                        <span>✓</span>
+                        <div>
+                            <small>NETWORK CONNECTION</small>
+                            <b>Ganache connected</b>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="medical-notice">
+                        <b>Ganache is not connected.</b>
+                        Start Ganache and check the RPC URL.
+                        {% if chain_error %}
+                        <p>{{ chain_error }}</p>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+
+                    <div class="evaluation-grid">
+
+                        <div class="evaluation-card">
+                            <small>Connection</small>
+                            <strong>
+                                {{ 'Connected' if blockchain_connected else 'Offline' }}
+                            </strong>
+                        </div>
+
+                        <div class="evaluation-card">
+                            <small>Latest block</small>
+                            <strong>{{ latest_block if latest_block is not none else '—' }}</strong>
+                        </div>
+
+                        <div class="evaluation-card">
+                            <small>Network ID</small>
+                            <strong>{{ network_id if network_id else '—' }}</strong>
+                        </div>
+
+                        <div class="evaluation-card">
+                            <small>Your records</small>
+                            <strong>{{ total_records }}</strong>
+                        </div>
+
+                    </div>
+
+                    <div class="record-meta">
+                        <p>
+                            <b>Contract address:</b>
+                            <span>{{ contract_address if contract_address else 'Not deployed' }}</span>
+                        </p>
+
+                        <p>
+                            <b>RPC endpoint:</b>
+                            <span>http://127.0.0.1:7545</span>
+                        </p>
+                    </div>
+
+                </section>
+
+                {% endif %}
+
+            </main>
+
+
+            <footer class="app-footer">
+                MediChain · Academic healthcare blockchain project
+            </footer>
+
+        </div>
+    </div>
+
+    {% endif %}
+
+
+    <!-- =====================================================
+     MODEL COMPARISON CHARTS
+===================================================== -->
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+
+            const chartData = {{ comparison|default ([]) | tojson
+        }};
+
+        function createModelChart(canvasId) {
+            const canvas = document.getElementById(canvasId);
+
+            if (!canvas || !chartData || chartData.length === 0) {
+                return;
+            }
+
+            new Chart(canvas, {
+                type: "bar",
+
+                data: {
+                    labels: chartData.map(item => item.model),
+
+                    datasets: [
+                        {
+                            label: "Accuracy",
+                            data: chartData.map(item => item.accuracy)
+                        },
+                        {
+                            label: "Precision",
+                            data: chartData.map(item => item.precision)
+                        },
+                        {
+                            label: "Recall",
+                            data: chartData.map(item => item.recall)
+                        },
+                        {
+                            label: "Macro F1",
+                            data: chartData.map(item => item.f1_score)
+                        },
+                        {
+                            label: "Balanced accuracy",
+                            data: chartData.map(item => item.balanced_accuracy)
+                        }
+                    ]
+                },
+
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: "Score (%)"
+                            }
+                        }
+                    },
+
+                    plugins: {
+                        legend: {
+                            position: "bottom"
+                        },
+
+                        tooltip: {
+                            callbacks: {
+                                label: function (context) {
+                                    return context.dataset.label + ": " +
+                                        Number(context.raw).toFixed(2) + "%";
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        createModelChart("dashboardModelChart");
+        createModelChart("resultModelChart");
+});
+    </script>
+
+</body>
+
+</html>
