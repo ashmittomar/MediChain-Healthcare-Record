@@ -444,11 +444,30 @@ def init_db():
 # ============================================================
 
 def get_cipher():
-    if not KEY_PATH.exists():
-        KEY_PATH.write_bytes(Fernet.generate_key())
-        logger.warning("Created a new encryption key.")
+    # Production: Read encryption key from Vercel environment
+    if IS_VERCEL:
+        key = os.getenv("MEDICHAIN_FERNET_KEY")
 
-    return Fernet(KEY_PATH.read_bytes().strip())
+        if not key:
+            raise RuntimeError(
+                "MEDICHAIN_FERNET_KEY is missing from Vercel."
+            )
+
+        try:
+            return Fernet(key.strip().encode())
+        except Exception as exc:
+            raise RuntimeError(
+                "Invalid MEDICHAIN_FERNET_KEY configuration."
+            ) from exc
+
+    # Local development: Continue using the existing key file
+    if KEY_PATH.exists():
+        key = KEY_PATH.read_bytes()
+    else:
+        key = Fernet.generate_key()
+        KEY_PATH.write_bytes(key)
+
+    return Fernet(key)
 
 
 def canonical_json(data):
