@@ -11,22 +11,18 @@ from functools import wraps
 import joblib
 import numpy as np
 import pandas as pd
+import psycopg2
+from psycopg2.extras import DictCursor
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
-BLOCKCHAIN_NETWORK = os.getenv("BLOCKCHAIN_NETWORK", "ganache").lower()
-
-BLOCKCHAIN_RPC_URL = os.getenv(
-    "BLOCKCHAIN_RPC_URL",
-    os.getenv("MEDICHAIN_GANACHE_URL", "http://127.0.0.1:7545")
-)
-
 from flask import (
     Flask, render_template, request, redirect,
     url_for, session, flash
 )
+
 from werkzeug.security import generate_password_hash, check_password_hash
 from cryptography.fernet import Fernet, InvalidToken
 
@@ -46,27 +42,61 @@ from sklearn.metrics import (
     confusion_matrix, classification_report
 )
 
+BLOCKCHAIN_NETWORK = os.getenv(
+    "BLOCKCHAIN_NETWORK",
+    "ganache"
+).lower()
+
+BLOCKCHAIN_RPC_URL = os.getenv(
+    "BLOCKCHAIN_RPC_URL",
+    os.getenv(
+        "MEDICHAIN_GANACHE_URL",
+        "http://127.0.0.1:7545"
+    )
+)
+
+
 
 # ============================================================
 # 1. CONFIGURATION
 # ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+IS_VERCEL = bool(os.getenv("VERCEL"))
+
+DB_TYPE = "postgresql" if DATABASE_URL else "sqlite"
+
 DB_PATH = BASE_DIR / "medichain.db"
+
 KEY_PATH = BASE_DIR / "medichain.key"
-DATASET_PATH = BASE_DIR / "datasets" / "synthetic_medical_symptoms_dataset.csv"
-MODEL_DIR = BASE_DIR / "models"
-MODEL_PATH = MODEL_DIR / "disease_model.joblib"
+
+DATASET_PATH = (
+    BASE_DIR / "datasets" /
+    "synthetic_medical_symptoms_dataset.csv"
+)
+
+if IS_VERCEL:
+    MODEL_DIR = Path("/tmp/medichain_models")
+else:
+    MODEL_DIR = BASE_DIR / "models"
 
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
+
+MODEL_PATH = MODEL_DIR / "disease_model.joblib"
+
 
 # ============================================================
 # BLOCKCHAIN CONFIGURATION
 # ============================================================
 
+DEFAULT_NETWORK = "sepolia" if IS_VERCEL else "ganache"
+
 BLOCKCHAIN_NETWORK = os.getenv(
     "BLOCKCHAIN_NETWORK",
-    "ganache"
+    DEFAULT_NETWORK
 ).lower()
 
 BLOCKCHAIN_RPC_URL = os.getenv(
@@ -95,21 +125,35 @@ if BLOCKCHAIN_NETWORK not in ("ganache", "sepolia"):
         "BLOCKCHAIN_NETWORK must be 'ganache' or 'sepolia'."
     )
 
+if IS_VERCEL and BLOCKCHAIN_NETWORK != "sepolia":
+    raise ValueError(
+        "Vercel deployment must use Sepolia."
+    )
+
 SOLC_VERSION = "0.8.20"
+
 MODEL_VERSION = 7
 
+
+# ============================================================
+# FLASK CONFIGURATION
+# ============================================================
+
 app = Flask(__name__)
-app.secret_key = os.environ.get(
+
+app.secret_key = os.getenv(
     "MEDICHAIN_SECRET_KEY",
     "change-this-secret-before-production"
 )
 
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE="Lax"
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=IS_VERCEL
 )
 
 logging.basicConfig(level=logging.INFO)
+
 logger = app.logger
 
 
@@ -157,46 +201,161 @@ MEASUREMENT_RANGES = {
 # 3. DATABASE
 # ============================================================
 
+class DatabaseConnection:
+
+    def __init__(self):
+        self.is_postgresql = DB_TYPE == "postgresql"
+
+        if self.is_postgresql:
+            self.connection = psycopg2.connect(
+                DATABASE_URL,
+                cursor_factory=DictCursor,
+                connect_timeout=10
+            )
+            self.cursor = None
+
+        else:
+            self.connection = sqlite3.connect(
+                DB_PATH,
+                timeout=30
+            )
+            self.connection.row_factory = sqlite3.Row
+            self.connection.execute(
+                "PRAGMA foreign_keys = ON"
+            )
+
+    def execute(self, query, parameters=()):
+
+        if self.is_postgresql:
+            query = query.replace("?", "%s")
+
+            cursor = self.connection.cursor()
+            cursor.execute(query, parameters)
+            return cursor
+
+        return self.connection.execute(
+            query,
+            parameters
+        )
+
+    def executescript(self, script):
+
+        if self.is_postgresql:
+            cursor = self.connection.cursor()
+
+            for statement in script.split(";"):
+                statement = statement.strip()
+
+                if statement:
+                    cursor.execute(statement)
+
+            cursor.close()
+
+        else:
+            self.connection.executescript(script)
+
+    def commit(self):
+        self.connection.commit()
+
+    def close(self):
+        self.connection.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+
+        try:
+            if exc_type is None:
+                self.commit()
+            else:
+                self.connection.rollback()
+        finally:
+            self.close()
+
+        return False
+
+
 def get_db():
-    db = sqlite3.connect(DB_PATH, timeout=30)
-    db.row_factory = sqlite3.Row
-    db.execute("PRAGMA foreign_keys = ON")
-    return db
+    return DatabaseConnection()
 
 
 def init_db():
+
     with get_db() as db:
-        db.executescript("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_uuid TEXT UNIQUE NOT NULL,
-                name TEXT NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                username TEXT UNIQUE NOT NULL,
-                password_hash TEXT NOT NULL,
-                blockchain_hash TEXT NOT NULL,
-                registration_tx TEXT NOT NULL,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP
-            );
 
-            CREATE TABLE IF NOT EXISTS consultations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                consultation_id TEXT UNIQUE NOT NULL,
-                user_id INTEGER NOT NULL,
-                encrypted_data BLOB NOT NULL,
-                record_hash TEXT NOT NULL,
-                prediction TEXT NOT NULL,
-                model_accuracy REAL,
-                blockchain_tx TEXT NOT NULL,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY(user_id) REFERENCES users(id)
-            );
+        if DB_TYPE == "postgresql":
 
-            CREATE TABLE IF NOT EXISTS chain_config (
-                id INTEGER PRIMARY KEY CHECK (id = 1),
-                contract_address TEXT NOT NULL
-            );
-        """)
+            db.executescript("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+                    user_uuid TEXT UNIQUE NOT NULL,
+                    name TEXT NOT NULL,
+                    email TEXT UNIQUE NOT NULL,
+                    username TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    blockchain_hash TEXT NOT NULL,
+                    registration_tx TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE IF NOT EXISTS consultations (
+                    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+                    consultation_id TEXT UNIQUE NOT NULL,
+                    user_id BIGINT NOT NULL,
+                    encrypted_data BYTEA NOT NULL,
+                    record_hash TEXT NOT NULL,
+                    prediction TEXT NOT NULL,
+                    model_accuracy DOUBLE PRECISION,
+                    blockchain_tx TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                );
+
+                CREATE TABLE IF NOT EXISTS chain_config (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    contract_address TEXT NOT NULL
+                );
+            """)
+
+        else:
+
+            db.executescript("""
+                CREATE TABLE IF NOT EXISTS users (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_uuid TEXT UNIQUE NOT NULL,
+                    name TEXT NOT NULL,
+                    email TEXT UNIQUE NOT NULL,
+                    username TEXT UNIQUE NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    blockchain_hash TEXT NOT NULL,
+                    registration_tx TEXT NOT NULL,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE IF NOT EXISTS consultations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    consultation_id TEXT UNIQUE NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    encrypted_data BLOB NOT NULL,
+                    record_hash TEXT NOT NULL,
+                    prediction TEXT NOT NULL,
+                    model_accuracy REAL,
+                    blockchain_tx TEXT NOT NULL,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(user_id) REFERENCES users(id)
+                );
+
+                CREATE TABLE IF NOT EXISTS chain_config (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    contract_address TEXT NOT NULL
+                );
+            """)
+
+    logger.info(
+        "Database initialized successfully using %s",
+        DB_TYPE
+    )
 
 
 # ============================================================

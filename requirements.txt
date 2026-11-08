@@ -8,3 +8,4 @@ cryptography
 web3
 py-solc-x
 python-dotenv
+psycopg2-binary
