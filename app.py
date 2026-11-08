@@ -731,32 +731,21 @@ def get_contract():
 
 
 
+
 def send_contract_transaction(function):
 
     web3, _ = get_contract()
-
-    private_key = BLOCKCHAIN_PRIVATE_KEY.strip()
-
-    print("\n--- PRIVATE KEY DIAGNOSTICS ---")
-    print("Loaded:", bool(private_key))
-    print("Length before prefix removal:", len(private_key))
-    print("Has 0x prefix:", private_key.startswith(("0x", "0X")))
-
-    if private_key.startswith(("0x", "0X")):
-        private_key = private_key[2:]
-
-    print("Length after prefix removal:", len(private_key))
-    print(
-        "Only hexadecimal characters:",
-        all(c in "0123456789abcdefABCDEF" for c in private_key)
-    )
-    print("--- END DIAGNOSTICS ---\n")
 
     # --------------------------------------------------------
     # GANACHE: use its unlocked development account
     # --------------------------------------------------------
 
     if BLOCKCHAIN_NETWORK == "ganache":
+
+        if not web3.eth.accounts:
+            raise RuntimeError(
+                "Ganache returned no unlocked accounts."
+            )
 
         tx_hash = function.transact({
             "from": web3.eth.accounts[0],
@@ -771,16 +760,14 @@ def send_contract_transaction(function):
 
         if not BLOCKCHAIN_PRIVATE_KEY:
             raise RuntimeError(
-                "Missing BLOCKCHAIN_PRIVATE_KEY in .env."
+                "BLOCKCHAIN_PRIVATE_KEY is missing from environment variables."
             )
 
-        # Normalize the private key BEFORE using it.
         private_key = BLOCKCHAIN_PRIVATE_KEY.strip()
 
         if private_key.startswith(("0x", "0X")):
             private_key = private_key[2:]
 
-        # Validate the private key without printing it.
         if len(private_key) != 64:
             raise ValueError(
                 "Invalid Sepolia private key length. "
@@ -792,20 +779,26 @@ def send_contract_transaction(function):
             for character in private_key
         ):
             raise ValueError(
-                "Sepolia private key contains invalid characters. "
-                "Check your .env configuration."
+                "Sepolia private key contains invalid characters."
             )
 
-        # Derive the account using the normalized key.
+        # Derive wallet account
         account = web3.eth.account.from_key(private_key)
 
-        # Confirm the account matches the wallet used to deploy
-        # your MediChain contract.
         logger.info(
             "Sending Sepolia transaction from account: %s",
             account.address
         )
 
+        # Check wallet balance before sending transaction
+        balance = web3.eth.get_balance(account.address)
+
+        if balance == 0:
+            raise RuntimeError(
+                "The Sepolia wallet has no ETH for gas fees."
+            )
+
+        # Build transaction
         transaction = function.build_transaction({
             "from": account.address,
             "nonce": web3.eth.get_transaction_count(
@@ -817,7 +810,7 @@ def send_contract_transaction(function):
             "gasPrice": web3.eth.gas_price
         })
 
-        # Sign using the SAME normalized private key.
+        # Sign transaction
         signed_transaction = web3.eth.account.sign_transaction(
             transaction,
             private_key=private_key
@@ -832,6 +825,7 @@ def send_contract_transaction(function):
         if raw_transaction is None:
             raw_transaction = signed_transaction.rawTransaction
 
+        # Send transaction to Sepolia
         tx_hash = web3.eth.send_raw_transaction(
             raw_transaction
         )
@@ -856,7 +850,6 @@ def send_contract_transaction(function):
         )
 
     return tx_hash.hex()
-
 
 
 def register_user_on_chain(identity_hash):
@@ -1490,8 +1483,8 @@ def register():
     except Exception:
         logger.exception("Registration failed.")
         flash(
-            "Registration failed. Check that Ganache is running "
-            "and inspect the VS Code terminal.",
+            "Registration failed. Check your blockchain network "
+            "configuration and Vercel runtime logs.",
             "danger"
         )
 
