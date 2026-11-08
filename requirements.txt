@@ -7,3 +7,4 @@ joblib
 cryptography
 web3
 py-solc-x
+python-dotenv
