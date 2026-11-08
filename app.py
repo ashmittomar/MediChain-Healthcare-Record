@@ -12,6 +12,17 @@ import joblib
 import numpy as np
 import pandas as pd
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BLOCKCHAIN_NETWORK = os.getenv("BLOCKCHAIN_NETWORK", "ganache").lower()
+
+BLOCKCHAIN_RPC_URL = os.getenv(
+    "BLOCKCHAIN_RPC_URL",
+    os.getenv("MEDICHAIN_GANACHE_URL", "http://127.0.0.1:7545")
+)
+
 from flask import (
     Flask, render_template, request, redirect,
     url_for, session, flash
@@ -49,10 +60,40 @@ MODEL_PATH = MODEL_DIR / "disease_model.joblib"
 
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
-GANACHE_URL = os.environ.get(
-    "MEDICHAIN_GANACHE_URL",
-    "http://127.0.0.1:7545"
+# ============================================================
+# BLOCKCHAIN CONFIGURATION
+# ============================================================
+
+BLOCKCHAIN_NETWORK = os.getenv(
+    "BLOCKCHAIN_NETWORK",
+    "ganache"
+).lower()
+
+BLOCKCHAIN_RPC_URL = os.getenv(
+    "BLOCKCHAIN_RPC_URL",
+    os.getenv(
+        "MEDICHAIN_GANACHE_URL",
+        "http://127.0.0.1:7545"
+    )
 )
+
+BLOCKCHAIN_PRIVATE_KEY = os.getenv(
+    "BLOCKCHAIN_PRIVATE_KEY"
+)
+
+BLOCKCHAIN_CONTRACT_ADDRESS = os.getenv(
+    "BLOCKCHAIN_CONTRACT_ADDRESS"
+)
+
+EXPECTED_CHAIN_ID = {
+    "ganache": None,
+    "sepolia": 11155111
+}.get(BLOCKCHAIN_NETWORK)
+
+if BLOCKCHAIN_NETWORK not in ("ganache", "sepolia"):
+    raise ValueError(
+        "BLOCKCHAIN_NETWORK must be 'ganache' or 'sepolia'."
+    )
 
 SOLC_VERSION = "0.8.20"
 MODEL_VERSION = 7
@@ -263,20 +304,42 @@ _contract_interface = None
 
 
 def blockchain_connection():
+
     web3 = Web3(
         Web3.HTTPProvider(
-            GANACHE_URL,
+            BLOCKCHAIN_RPC_URL,
             request_kwargs={"timeout": 15}
         )
     )
 
     if not web3.is_connected():
         raise RuntimeError(
-            f"Cannot connect to Ganache at {GANACHE_URL}"
+            f"Cannot connect to blockchain at {BLOCKCHAIN_RPC_URL}"
         )
 
-    if not web3.eth.accounts:
-        raise RuntimeError("Ganache returned no accounts.")
+    actual_chain_id = web3.eth.chain_id
+
+    if (
+        EXPECTED_CHAIN_ID is not None
+        and actual_chain_id != EXPECTED_CHAIN_ID
+    ):
+        raise RuntimeError(
+            f"Wrong blockchain network. "
+            f"Expected chain ID {EXPECTED_CHAIN_ID}, "
+            f"received {actual_chain_id}."
+        )
+
+    if BLOCKCHAIN_NETWORK == "ganache":
+        if not web3.eth.accounts:
+            raise RuntimeError(
+                "Ganache returned no unlocked accounts."
+            )
+
+    elif BLOCKCHAIN_NETWORK == "sepolia":
+        if not BLOCKCHAIN_PRIVATE_KEY:
+            raise RuntimeError(
+                "BLOCKCHAIN_PRIVATE_KEY is required for Sepolia."
+            )
 
     return web3
 
@@ -325,6 +388,40 @@ def get_contract():
     web3 = blockchain_connection()
     interface = get_compiled_contract()
 
+    # --------------------------------------------------------
+    # 1. Use explicitly configured contract address if provided
+    # --------------------------------------------------------
+
+    if BLOCKCHAIN_CONTRACT_ADDRESS:
+        address = Web3.to_checksum_address(
+            BLOCKCHAIN_CONTRACT_ADDRESS
+        )
+
+        if not contract_is_compatible(web3, address, interface):
+            raise RuntimeError(
+                "Configured smart contract is not compatible "
+                "with the selected blockchain network."
+            )
+
+        return web3, web3.eth.contract(
+            address=address,
+            abi=interface["abi"]
+        )
+
+    # --------------------------------------------------------
+    # 2. Sepolia must use an already-deployed contract
+    # --------------------------------------------------------
+
+    if BLOCKCHAIN_NETWORK == "sepolia":
+        raise RuntimeError(
+            "BLOCKCHAIN_CONTRACT_ADDRESS is required for Sepolia. "
+            "Deploy the contract first and configure its address."
+        )
+
+    # --------------------------------------------------------
+    # 3. Ganache: check the locally saved contract address
+    # --------------------------------------------------------
+
     with get_db() as db:
         saved = db.execute(
             "SELECT contract_address FROM chain_config WHERE id = 1"
@@ -343,7 +440,18 @@ def get_contract():
                 )
 
         except Exception:
-            logger.warning("Saved contract is no longer available.")
+            logger.warning(
+                "Saved Ganache contract is unavailable."
+            )
+
+    # --------------------------------------------------------
+    # 4. Ganache only: deploy contract automatically
+    # --------------------------------------------------------
+
+    if BLOCKCHAIN_NETWORK != "ganache":
+        raise RuntimeError(
+            "Automatic contract deployment is only enabled for Ganache."
+        )
 
     factory = web3.eth.contract(
         abi=interface["abi"],
@@ -361,20 +469,30 @@ def get_contract():
     )
 
     if receipt.status != 1:
-        raise RuntimeError("Smart contract deployment failed.")
+        raise RuntimeError(
+            "Smart contract deployment failed."
+        )
 
-    address = Web3.to_checksum_address(receipt.contractAddress)
+    address = Web3.to_checksum_address(
+        receipt.contractAddress
+    )
 
     with get_db() as db:
         db.execute(
             """
-            INSERT OR REPLACE INTO chain_config(id, contract_address)
+            INSERT OR REPLACE INTO chain_config(
+                id,
+                contract_address
+            )
             VALUES (1, ?)
             """,
             (address,)
         )
 
-    logger.info("Contract deployed at %s", address)
+    logger.info(
+        "Ganache contract deployed at %s",
+        address
+    )
 
     return web3, web3.eth.contract(
         address=address,
@@ -382,13 +500,120 @@ def get_contract():
     )
 
 
+
 def send_contract_transaction(function):
+
     web3, _ = get_contract()
 
-    tx_hash = function.transact({
-        "from": web3.eth.accounts[0],
-        "gas": 500000
-    })
+    private_key = BLOCKCHAIN_PRIVATE_KEY.strip()
+
+    print("\n--- PRIVATE KEY DIAGNOSTICS ---")
+    print("Loaded:", bool(private_key))
+    print("Length before prefix removal:", len(private_key))
+    print("Has 0x prefix:", private_key.startswith(("0x", "0X")))
+
+    if private_key.startswith(("0x", "0X")):
+        private_key = private_key[2:]
+
+    print("Length after prefix removal:", len(private_key))
+    print(
+        "Only hexadecimal characters:",
+        all(c in "0123456789abcdefABCDEF" for c in private_key)
+    )
+    print("--- END DIAGNOSTICS ---\n")
+
+    # --------------------------------------------------------
+    # GANACHE: use its unlocked development account
+    # --------------------------------------------------------
+
+    if BLOCKCHAIN_NETWORK == "ganache":
+
+        tx_hash = function.transact({
+            "from": web3.eth.accounts[0],
+            "gas": 500000
+        })
+
+    # --------------------------------------------------------
+    # SEPOLIA: sign transactions using the configured key
+    # --------------------------------------------------------
+
+    elif BLOCKCHAIN_NETWORK == "sepolia":
+
+        if not BLOCKCHAIN_PRIVATE_KEY:
+            raise RuntimeError(
+                "Missing BLOCKCHAIN_PRIVATE_KEY in .env."
+            )
+
+        # Normalize the private key BEFORE using it.
+        private_key = BLOCKCHAIN_PRIVATE_KEY.strip()
+
+        if private_key.startswith(("0x", "0X")):
+            private_key = private_key[2:]
+
+        # Validate the private key without printing it.
+        if len(private_key) != 64:
+            raise ValueError(
+                "Invalid Sepolia private key length. "
+                "Expected 64 hexadecimal characters."
+            )
+
+        if not all(
+            character in "0123456789abcdefABCDEF"
+            for character in private_key
+        ):
+            raise ValueError(
+                "Sepolia private key contains invalid characters. "
+                "Check your .env configuration."
+            )
+
+        # Derive the account using the normalized key.
+        account = web3.eth.account.from_key(private_key)
+
+        # Confirm the account matches the wallet used to deploy
+        # your MediChain contract.
+        logger.info(
+            "Sending Sepolia transaction from account: %s",
+            account.address
+        )
+
+        transaction = function.build_transaction({
+            "from": account.address,
+            "nonce": web3.eth.get_transaction_count(
+                account.address,
+                "pending"
+            ),
+            "chainId": web3.eth.chain_id,
+            "gas": 500000,
+            "gasPrice": web3.eth.gas_price
+        })
+
+        # Sign using the SAME normalized private key.
+        signed_transaction = web3.eth.account.sign_transaction(
+            transaction,
+            private_key=private_key
+        )
+
+        raw_transaction = getattr(
+            signed_transaction,
+            "raw_transaction",
+            None
+        )
+
+        if raw_transaction is None:
+            raw_transaction = signed_transaction.rawTransaction
+
+        tx_hash = web3.eth.send_raw_transaction(
+            raw_transaction
+        )
+
+    else:
+        raise RuntimeError(
+            "Unsupported blockchain network."
+        )
+
+    # --------------------------------------------------------
+    # WAIT FOR TRANSACTION CONFIRMATION
+    # --------------------------------------------------------
 
     receipt = web3.eth.wait_for_transaction_receipt(
         tx_hash,
@@ -396,9 +621,12 @@ def send_contract_transaction(function):
     )
 
     if receipt.status != 1:
-        raise RuntimeError("Blockchain transaction failed.")
+        raise RuntimeError(
+            "Blockchain transaction failed."
+        )
 
     return tx_hash.hex()
+
 
 
 def register_user_on_chain(identity_hash):
@@ -1249,6 +1477,8 @@ def symptom_checker():
         )
 
     except ValueError as exc:
+
+        logger.exception("ValueError in symptom checker")
         flash(str(exc), "danger")
 
     except Exception:
@@ -1554,3 +1784,5 @@ if __name__ == "__main__":
         port=5000,
         debug=True
     )
+
+
