@@ -151,12 +151,17 @@ if BLOCKCHAIN_NETWORK not in ("ganache", "sepolia"):
 
 if IS_VERCEL and BLOCKCHAIN_NETWORK != "sepolia":
     raise RuntimeError(
-        "Vercel must use the Sepolia network."
+        "Vercel must use the Sepolia blockchain network."
     )
 
-SOLC_VERSION = "0.8.20"
-
-MODEL_VERSION = 7
+if IS_VERCEL and (
+    not BLOCKCHAIN_RPC_URL
+    or "127.0.0.1" in BLOCKCHAIN_RPC_URL
+    or "localhost" in BLOCKCHAIN_RPC_URL
+):
+    raise RuntimeError(
+        "Invalid blockchain RPC URL for Vercel."
+    )
 
 
 # ============================================================
