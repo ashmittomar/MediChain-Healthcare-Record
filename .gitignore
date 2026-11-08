@@ -44,3 +44,6 @@ Thumbs.db
 .pytest_cache/
 .mypy_cache/
 .coverage
+
+# Local Ganache application
+app_ganache.py
