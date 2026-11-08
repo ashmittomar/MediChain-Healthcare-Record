@@ -56,6 +56,11 @@ BLOCKCHAIN_RPC_URL = os.getenv(
 )
 
 
+# Use Vercel's writable temporary directory for Solidity compiler
+SOLCX_PATH = Path("/tmp/solcx")
+SOLCX_PATH.mkdir(parents=True, exist_ok=True)
+
+os.environ["SOLCX_BINARY_PATH"] = str(SOLCX_PATH)
 
 # ============================================================
 # 1. CONFIGURATION
@@ -578,28 +583,38 @@ def blockchain_connection():
 
     return web3
 
-
 def get_compiled_contract():
+
     global _contract_interface
 
     if _contract_interface is not None:
         return _contract_interface
 
     installed = {
-        str(version) for version in get_installed_solc_versions()
+        str(version)
+        for version in get_installed_solc_versions(
+            solcx_binary_path=str(SOLCX_PATH)
+        )
     }
 
     if SOLC_VERSION not in installed:
-        install_solc(SOLC_VERSION)
+        install_solc(
+            SOLC_VERSION,
+            solcx_binary_path=str(SOLCX_PATH)
+        )
 
     compiled = compile_source(
         CONTRACT_SOURCE,
         output_values=["abi", "bin"],
         solc_version=SOLC_VERSION,
-        evm_version="paris"
+        evm_version="paris",
+        solc_binary=str(
+            SOLCX_PATH / f"solc-v{SOLC_VERSION}"
+        )
     )
 
     _contract_interface = next(iter(compiled.values()))
+
     return _contract_interface
 
 
