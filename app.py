@@ -60,12 +60,20 @@ BLOCKCHAIN_RPC_URL = os.getenv(
 # ============================================================
 # 1. CONFIGURATION
 # ============================================================
+# ==========================================
+# APPLICATION CONFIGURATION
+# ==========================================
 
 BASE_DIR = Path(__file__).resolve().parent
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-
+# Environment detection
 IS_VERCEL = bool(os.getenv("VERCEL"))
+
+# ==========================================
+# DATABASE CONFIGURATION
+# ==========================================
+
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 DB_TYPE = "postgresql" if DATABASE_URL else "sqlite"
 
@@ -76,12 +84,24 @@ if IS_VERCEL and not DATABASE_URL:
 
 DB_PATH = BASE_DIR / "medichain.db"
 
+# ==========================================
+# ENCRYPTION KEY CONFIGURATION
+# ==========================================
+
 KEY_PATH = BASE_DIR / "medichain.key"
+
+# ==========================================
+# DATASET CONFIGURATION
+# ==========================================
 
 DATASET_PATH = (
     BASE_DIR / "datasets" /
     "synthetic_medical_symptoms_dataset.csv"
 )
+
+# ==========================================
+# MACHINE LEARNING MODEL CONFIGURATION
+# ==========================================
 
 if IS_VERCEL:
     MODEL_DIR = Path("/tmp/medichain_models")
@@ -91,6 +111,52 @@ else:
 MODEL_DIR.mkdir(parents=True, exist_ok=True)
 
 MODEL_PATH = MODEL_DIR / "disease_model.joblib"
+
+# ==========================================
+# BLOCKCHAIN CONFIGURATION
+# ==========================================
+
+DEFAULT_NETWORK = "sepolia" if IS_VERCEL else "ganache"
+
+BLOCKCHAIN_NETWORK = os.getenv(
+    "BLOCKCHAIN_NETWORK",
+    DEFAULT_NETWORK
+).lower()
+
+BLOCKCHAIN_RPC_URL = os.getenv(
+    "BLOCKCHAIN_RPC_URL",
+    os.getenv(
+        "MEDICHAIN_GANACHE_URL",
+        "http://127.0.0.1:7545"
+    )
+)
+
+BLOCKCHAIN_PRIVATE_KEY = os.getenv(
+    "BLOCKCHAIN_PRIVATE_KEY"
+)
+
+BLOCKCHAIN_CONTRACT_ADDRESS = os.getenv(
+    "BLOCKCHAIN_CONTRACT_ADDRESS"
+)
+
+EXPECTED_CHAIN_ID = {
+    "ganache": None,
+    "sepolia": 11155111
+}.get(BLOCKCHAIN_NETWORK)
+
+if BLOCKCHAIN_NETWORK not in ("ganache", "sepolia"):
+    raise ValueError(
+        "BLOCKCHAIN_NETWORK must be ganache or sepolia."
+    )
+
+if IS_VERCEL and BLOCKCHAIN_NETWORK != "sepolia":
+    raise RuntimeError(
+        "Vercel must use the Sepolia network."
+    )
+
+SOLC_VERSION = "0.8.20"
+
+MODEL_VERSION = 7
 
 
 # ============================================================
