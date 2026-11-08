@@ -69,6 +69,11 @@ IS_VERCEL = bool(os.getenv("VERCEL"))
 
 DB_TYPE = "postgresql" if DATABASE_URL else "sqlite"
 
+if IS_VERCEL and not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL is missing from Vercel Environment Variables."
+    )
+
 DB_PATH = BASE_DIR / "medichain.db"
 
 KEY_PATH = BASE_DIR / "medichain.key"
