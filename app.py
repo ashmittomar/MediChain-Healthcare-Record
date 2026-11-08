@@ -469,7 +469,6 @@ def get_cipher():
 
     return Fernet(key)
 
-
 def canonical_json(data):
     return json.dumps(
         data,
