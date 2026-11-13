@@ -5,7 +5,7 @@ import hashlib
 import sqlite3
 import logging
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from functools import wraps
 import secrets
 import re
@@ -233,19 +233,39 @@ MODEL_VERSION = 7
 
 app = Flask(__name__)
 
-app.secret_key = os.getenv(
-    "MEDICHAIN_SECRET_KEY",
-    "change-this-secret-before-production"
+# Flask's default session is a signed client-side cookie. The signing key
+# MUST remain identical across all Vercel function invocations so Authlib
+# can read the OAuth state saved by /google/login when Google returns to
+# /google/callback.
+FLASK_SECRET_KEY = (
+    os.getenv("FLASK_SECRET_KEY")
+    or os.getenv("MEDICHAIN_SECRET_KEY")
 )
 
+if IS_VERCEL and not FLASK_SECRET_KEY:
+    raise RuntimeError(
+        "Set FLASK_SECRET_KEY in Vercel Environment Variables. "
+        "It must be a permanent random secret and must not change between "
+        "deployments."
+    )
+
+if not FLASK_SECRET_KEY:
+    # Local-development fallback only. Set FLASK_SECRET_KEY in .env for
+    # deployments and for consistent local sessions across restarts.
+    FLASK_SECRET_KEY = "local-development-only-change-this-secret"
+
 app.config.update(
+    SECRET_KEY=FLASK_SECRET_KEY,
+    SESSION_COOKIE_NAME="medichain_session",
     SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SECURE=IS_VERCEL,
     SESSION_COOKIE_SAMESITE="Lax",
-    SESSION_COOKIE_SECURE=IS_VERCEL
+    SESSION_COOKIE_PATH="/",
+    SESSION_REFRESH_EACH_REQUEST=False,
+    PERMANENT_SESSION_LIFETIME=timedelta(hours=2),
 )
 
 logging.basicConfig(level=logging.INFO)
-
 logger = app.logger
 
 
@@ -262,7 +282,7 @@ google = oauth.register(
     server_metadata_url=(
         "https://accounts.google.com/.well-known/openid-configuration"
     ),
-    client_kwargs={"scope": "openid email profile"}
+    client_kwargs={"scope": "openid email profile"},
 )
 
 
@@ -270,16 +290,18 @@ def google_oauth_is_configured():
     return bool(
         os.getenv("GOOGLE_CLIENT_ID")
         and os.getenv("GOOGLE_CLIENT_SECRET")
+        and os.getenv("GOOGLE_REDIRECT_URI")
     )
 
 
 def establish_user_session(user):
-    """Use one consistent session format for all login methods."""
+    """Create the authenticated MediChain session after verified Google login."""
     session.clear()
+    session.permanent = True
     session["user_id"] = user["id"]
     session["username"] = user["username"]
     session["name"] = user["name"]
-
+    session.modified = True
 
 
 # ============================================================
@@ -1570,19 +1592,42 @@ def login():
 @app.route("/google/login")
 def google_login():
     if not google_oauth_is_configured():
-        flash(
-            "Google Sign-In is not configured. Add GOOGLE_CLIENT_ID and "
-            "GOOGLE_CLIENT_SECRET to your environment variables.",
-            "warning"
+        logger.error(
+            "Google OAuth is missing GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, "
+            "or GOOGLE_REDIRECT_URI."
         )
+        flash("Google Sign-In is not configured. Check the Vercel environment variables.", "danger")
         return redirect(url_for("login"))
 
-    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
-    if not redirect_uri:
-        flash("GOOGLE_REDIRECT_URI is missing.", "danger")
+    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI", "").strip().rstrip("/")
+    expected_callback = "https://medichain-healthcare-record.vercel.app/google/callback"
+
+    # On production, require the configured callback to be the canonical
+    # production callback. This prevents accidentally starting OAuth on one
+    # Vercel hostname and returning to another.
+    if IS_VERCEL and redirect_uri != expected_callback:
+        logger.error(
+            "GOOGLE_REDIRECT_URI does not match the canonical callback. "
+            "Configured host/path: %s",
+            redirect_uri
+        )
+        flash("Google Sign-In callback configuration is incorrect.", "danger")
         return redirect(url_for("login"))
 
-    return google.authorize_redirect(redirect_uri)
+    # Authlib stores its CSRF state in Flask's session. Make the session
+    # permanent and mark it modified so Flask emits the cookie on this
+    # redirect response. SameSite=Lax allows the cookie on Google's
+    # top-level GET redirect back to /google/callback.
+    session.permanent = True
+    session.modified = True
+
+    try:
+        response = google.authorize_redirect(redirect_uri)
+        return response
+    except Exception:
+        logger.exception("Could not start Google OAuth.")
+        flash("Could not start Google Sign-In. Check the application logs.", "danger")
+        return redirect(url_for("login"))
 
 
 @app.route("/google/callback")
@@ -1591,8 +1636,19 @@ def google_callback():
         flash("Google Sign-In is not configured.", "danger")
         return redirect(url_for("login"))
 
+    # Google returns an OAuth error directly in the query string when the
+    # user cancels or the provider rejects the request.
+    provider_error = request.args.get("error")
+    if provider_error:
+        logger.warning("Google OAuth returned an error: %s", provider_error)
+        flash("Google Sign-In was cancelled or rejected by Google.", "warning")
+        return redirect(url_for("login"))
+
     try:
+        # This validates Authlib's saved state against Google's returned
+        # state. Do not disable this check; it protects against CSRF.
         token = google.authorize_access_token()
+
         user_info = token.get("userinfo")
         if not user_info:
             user_info = google.parse_id_token(token)
@@ -1609,12 +1665,11 @@ def google_callback():
             email_verified = email_verified.lower() == "true"
 
         if not google_sub or not email or not name or not email_verified:
-            flash(
-                "A verified Google email and valid profile are required.",
-                "danger"
-            )
-            return redirect(url_for("login"))
+            raise ValueError("A verified Google email and valid profile are required.")
 
+        # First look up by immutable Google subject. If no link exists,
+        # attach the verified Google identity to an existing account with
+        # the same email so existing consultations remain associated.
         with get_db() as db:
             user = db.execute(
                 "SELECT * FROM users WHERE google_sub = ?",
@@ -1628,12 +1683,11 @@ def google_callback():
                 ).fetchone()
 
                 if user is not None:
-                    if user["google_sub"] and user["google_sub"] != google_sub:
-                        flash(
-                            "This email is linked to a different Google account.",
-                            "danger"
+                    existing_google_sub = user["google_sub"]
+                    if existing_google_sub and existing_google_sub != google_sub:
+                        raise ValueError(
+                            "This email is already linked to a different Google account."
                         )
-                        return redirect(url_for("login"))
 
                     db.execute(
                         "UPDATE users SET google_sub = ? WHERE id = ?",
@@ -1645,7 +1699,8 @@ def google_callback():
                     ).fetchone()
 
         if user is None:
-            # Keep the existing users table requirements and blockchain flow.
+            # Preserve the existing database schema and blockchain-based
+            # user registration flow for genuinely new Google accounts.
             base_username = re.sub(
                 r"[^a-zA-Z0-9_]",
                 "_",
@@ -1680,17 +1735,21 @@ def google_callback():
                 ).fetchone()
 
         if user is None:
-            raise RuntimeError("Google account could not be loaded.")
+            raise RuntimeError("Google account could not be loaded after sign-in.")
 
         establish_user_session(user)
         flash("You are signed in with your Google account.", "success")
         return redirect(url_for("dashboard"))
 
-    except Exception:
-        logger.exception("Google OAuth callback failed.")
+    except Exception as exc:
+        # Log the exception type and traceback in Vercel Runtime Logs.
+        # Never log access tokens, ID tokens, secrets, or private keys.
+        logger.exception(
+            "Google OAuth callback failed (%s).",
+            type(exc).__name__
+        )
         flash(
-            "Google sign-in could not be completed. Check OAuth settings "
-            "and the application logs.",
+            "Google sign-in could not be completed. Check the application logs.",
             "danger"
         )
         return redirect(url_for("login"))
