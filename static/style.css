@@ -170,17 +170,30 @@ video {
 /* ---------- 4. FLASH MESSAGES ---------- */
 
 .flash-container {
-    width: min(1200px, 90%);
-    margin: 15px auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: min(1120px, 91%);
+    margin: 15px auto 20px;
+    position: relative;
+    z-index: 100;
 }
 
 .flash-message {
-    padding: 13px 16px;
-    margin-bottom: 10px;
+    display: block;
+    width: 100%;
+    min-height: 48px;
+    height: auto;
+    padding: 14px 18px;
+    margin: 0;
     border: 1px solid transparent;
     border-radius: 9px;
     font-size: 13px;
     line-height: 1.6;
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    box-sizing: border-box;
 }
 
 .flash-message.success {
@@ -200,6 +213,33 @@ video {
     color: #856404;
     background: #fff8e5;
     border-color: #eedfbf;
+}
+
+.flash-message.info {
+    color: #175c9c;
+    background: #eaf4ff;
+    border-color: #c8e0fa;
+}
+
+/* Dashboard notification alignment */
+.app-main>.flash-container {
+    width: min(1120px, 91%);
+    margin: 15px auto 0;
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+
+    .flash-container,
+    .app-main>.flash-container {
+        width: 92%;
+        margin: 12px auto;
+    }
+
+    .flash-message {
+        padding: 12px 14px;
+        font-size: 12px;
+    }
 }
 
 
