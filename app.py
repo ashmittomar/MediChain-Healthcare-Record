@@ -7,6 +7,8 @@ import logging
 from pathlib import Path
 from datetime import datetime, timezone
 from functools import wraps
+import secrets
+import re
 
 import joblib
 import numpy as np
@@ -22,12 +24,18 @@ from flask import (
     Flask, render_template, request, redirect,
     url_for, session, flash
 )
+from authlib.integrations.flask_client import OAuth
 
 from werkzeug.security import generate_password_hash, check_password_hash
 from cryptography.fernet import Fernet, InvalidToken
 
 from web3 import Web3
-from solcx import compile_source, install_solc, get_installed_solc_versions
+from solcx import (
+    compile_source,
+    install_solc,
+    get_installed_solc_versions,
+)
+from solcx.install import get_executable
 
 from sklearn.model_selection import train_test_split
 from sklearn.compose import ColumnTransformer
@@ -56,23 +64,26 @@ BLOCKCHAIN_RPC_URL = os.getenv(
 )
 
 
-# Use Vercel's writable temporary directory for Solidity compiler
-SOLCX_PATH = Path("/tmp/solcx")
-SOLCX_PATH.mkdir(parents=True, exist_ok=True)
+# ============================================================
+# APPLICATION PATHS AND ENVIRONMENT
+# ============================================================
 
+BASE_DIR = Path(__file__).resolve().parent
+IS_VERCEL = bool(os.getenv("VERCEL"))
+
+# Vercel only permits writes to /tmp. On Windows/local development,
+# keep the Solidity compiler inside the project in a dedicated folder.
+SOLCX_PATH = (
+    Path("/tmp/solcx")
+    if IS_VERCEL
+    else BASE_DIR / ".solcx"
+)
+SOLCX_PATH.mkdir(parents=True, exist_ok=True)
 os.environ["SOLCX_BINARY_PATH"] = str(SOLCX_PATH)
 
 # ============================================================
 # 1. CONFIGURATION
 # ============================================================
-# ==========================================
-# APPLICATION CONFIGURATION
-# ==========================================
-
-BASE_DIR = Path(__file__).resolve().parent
-
-# Environment detection
-IS_VERCEL = bool(os.getenv("VERCEL"))
 
 # ==========================================
 # DATABASE CONFIGURATION
@@ -236,6 +247,39 @@ app.config.update(
 logging.basicConfig(level=logging.INFO)
 
 logger = app.logger
+
+
+# ============================================================
+# GOOGLE OAUTH CONFIGURATION
+# ============================================================
+
+oauth = OAuth(app)
+
+google = oauth.register(
+    name="google",
+    client_id=os.getenv("GOOGLE_CLIENT_ID"),
+    client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+    server_metadata_url=(
+        "https://accounts.google.com/.well-known/openid-configuration"
+    ),
+    client_kwargs={"scope": "openid email profile"}
+)
+
+
+def google_oauth_is_configured():
+    return bool(
+        os.getenv("GOOGLE_CLIENT_ID")
+        and os.getenv("GOOGLE_CLIENT_SECRET")
+    )
+
+
+def establish_user_session(user):
+    """Use one consistent session format for all login methods."""
+    session.clear()
+    session["user_id"] = user["id"]
+    session["username"] = user["username"]
+    session["name"] = user["name"]
+
 
 
 # ============================================================
@@ -433,6 +477,26 @@ def init_db():
                 );
             """)
 
+        # Additive migration: preserve all existing user records.
+        if DB_TYPE == "postgresql":
+            db.execute(
+                "ALTER TABLE users ADD COLUMN IF NOT EXISTS google_sub TEXT"
+            )
+        else:
+            columns = {
+                row["name"]
+                for row in db.execute("PRAGMA table_info(users)").fetchall()
+            }
+            if "google_sub" not in columns:
+                db.execute("ALTER TABLE users ADD COLUMN google_sub TEXT")
+
+        db.execute(
+            """
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_sub
+            ON users(google_sub)
+            """
+        )
+
     logger.info(
         "Database initialized successfully using %s",
         DB_TYPE
@@ -616,9 +680,27 @@ def get_compiled_contract():
     }
 
     if SOLC_VERSION not in installed:
+        logger.info(
+            "Solidity compiler %s is not installed. Installing it in %s",
+            SOLC_VERSION,
+            SOLCX_PATH,
+        )
         install_solc(
             SOLC_VERSION,
             solcx_binary_path=str(SOLCX_PATH)
+        )
+
+    # Resolve the executable through py-solc-x instead of constructing
+    # a filename manually. Windows requires the .exe suffix; Linux does not.
+    solc_executable = get_executable(
+        SOLC_VERSION,
+        solcx_binary_path=str(SOLCX_PATH)
+    )
+
+    if not solc_executable.exists():
+        raise FileNotFoundError(
+            f"Solidity compiler executable was not found: {solc_executable}. "
+            f"Install solc {SOLC_VERSION} and check folder permissions."
         )
 
     compiled = compile_source(
@@ -626,9 +708,7 @@ def get_compiled_contract():
         output_values=["abi", "bin"],
         solc_version=SOLC_VERSION,
         evm_version="paris",
-        solc_binary=str(
-            SOLCX_PATH / f"solc-v{SOLC_VERSION}"
-        )
+        solc_binary=str(solc_executable)
     )
 
     _contract_interface = next(iter(compiled.values()))
@@ -1453,109 +1533,167 @@ def index():
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
-    if request.method == "GET":
-        return render_template("index.html", page="register")
+    """
+    Google-only registration entry point.
 
-    name = request.form.get("name", "").strip()
-    email = request.form.get("email", "").strip().lower()
-    username = request.form.get("username", "").strip()
-    password = request.form.get("password", "")
+    The route name is retained so existing template links remain valid.
+    No account is created from user-submitted name/email/password fields.
+    New accounts are created only after a verified Google OAuth callback.
+    """
+    if session.get("user_id"):
+        return redirect(url_for("dashboard"))
 
-    if not all([name, email, username, password]):
-        flash("Complete all registration fields.", "danger")
-        return render_template("index.html", page="register")
-
-    if len(password) < 8:
-        flash("Password must contain at least 8 characters.", "danger")
-        return render_template("index.html", page="register")
-
-    with get_db() as db:
-        duplicate = db.execute(
-            """
-            SELECT id FROM users
-            WHERE username = ? OR email = ?
-            """,
-            (username, email)
-        ).fetchone()
-
-    if duplicate:
-        flash("Username or email is already registered.", "danger")
-        return render_template("index.html", page="register")
-
-    try:
-        identity_hash = hashlib.sha256(
-            username.lower().encode("utf-8")
-        ).hexdigest()
-
-        registration_tx = register_user_on_chain(identity_hash)
-
-        with get_db() as db:
-            db.execute(
-                """
-                INSERT INTO users(
-                    user_uuid, name, email, username,
-                    password_hash, blockchain_hash, registration_tx
-                )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    str(uuid.uuid4()),
-                    name,
-                    email,
-                    username,
-                    generate_password_hash(password),
-                    identity_hash,
-                    registration_tx
-                )
-            )
-
-                
-            
-
-        flash("Account created. Please sign in.", "success")
-        return redirect(url_for("login"))
-
-    except sqlite3.IntegrityError:
-        flash("Username or email already exists.", "danger")
-
-    except Exception:
-        logger.exception("Registration failed.")
-        flash(
-            "Registration failed. Check your blockchain network "
-            "configuration and Vercel runtime logs.",
-            "danger"
-        )
+    if request.method == "POST":
+        return redirect(url_for("google_login"))
 
     return render_template("index.html", page="register")
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if request.method == "GET":
-        return render_template("index.html", page="login")
+    """
+    Google-only login entry point.
 
-    username = request.form.get("username", "").strip()
-    password = request.form.get("password", "")
+    Existing password-based accounts remain in the database. On the first
+    Google sign-in, a verified matching email is linked to the existing
+    account by google_callback(), preserving its consultations and records.
+    """
+    if session.get("user_id"):
+        return redirect(url_for("dashboard"))
 
-    with get_db() as db:
-        user = db.execute(
-            "SELECT * FROM users WHERE username = ?",
-            (username,)
-        ).fetchone()
+    if request.method == "POST":
+        return redirect(url_for("google_login"))
 
-    if (
-        user is None
-        or not check_password_hash(user["password_hash"], password)
-    ):
-        flash("Invalid username or password.", "danger")
-        return render_template("index.html", page="login")
+    return render_template("index.html", page="login")
 
-    session.clear()
-    session["user_id"] = user["id"]
-    session["username"] = user["username"]
-    session["name"] = user["name"]
 
-    return redirect(url_for("dashboard"))
+@app.route("/google/login")
+def google_login():
+    if not google_oauth_is_configured():
+        flash(
+            "Google Sign-In is not configured. Add GOOGLE_CLIENT_ID and "
+            "GOOGLE_CLIENT_SECRET to your environment variables.",
+            "warning"
+        )
+        return redirect(url_for("login"))
+
+    redirect_uri = os.getenv("GOOGLE_REDIRECT_URI")
+    if not redirect_uri:
+        flash("GOOGLE_REDIRECT_URI is missing.", "danger")
+        return redirect(url_for("login"))
+
+    return google.authorize_redirect(redirect_uri)
+
+
+@app.route("/google/callback")
+def google_callback():
+    if not google_oauth_is_configured():
+        flash("Google Sign-In is not configured.", "danger")
+        return redirect(url_for("login"))
+
+    try:
+        token = google.authorize_access_token()
+        user_info = token.get("userinfo")
+        if not user_info:
+            user_info = google.parse_id_token(token)
+
+        if not user_info:
+            raise ValueError("Google did not return profile information.")
+
+        google_sub = str(user_info.get("sub", "")).strip()
+        email = str(user_info.get("email", "")).strip().lower()
+        name = str(user_info.get("name", "")).strip()
+        email_verified = user_info.get("email_verified", False)
+
+        if isinstance(email_verified, str):
+            email_verified = email_verified.lower() == "true"
+
+        if not google_sub or not email or not name or not email_verified:
+            flash(
+                "A verified Google email and valid profile are required.",
+                "danger"
+            )
+            return redirect(url_for("login"))
+
+        with get_db() as db:
+            user = db.execute(
+                "SELECT * FROM users WHERE google_sub = ?",
+                (google_sub,)
+            ).fetchone()
+
+            if user is None:
+                user = db.execute(
+                    "SELECT * FROM users WHERE LOWER(email) = ?",
+                    (email,)
+                ).fetchone()
+
+                if user is not None:
+                    if user["google_sub"] and user["google_sub"] != google_sub:
+                        flash(
+                            "This email is linked to a different Google account.",
+                            "danger"
+                        )
+                        return redirect(url_for("login"))
+
+                    db.execute(
+                        "UPDATE users SET google_sub = ? WHERE id = ?",
+                        (google_sub, user["id"])
+                    )
+                    user = db.execute(
+                        "SELECT * FROM users WHERE id = ?",
+                        (user["id"],)
+                    ).fetchone()
+
+        if user is None:
+            # Keep the existing users table requirements and blockchain flow.
+            base_username = re.sub(
+                r"[^a-zA-Z0-9_]",
+                "_",
+                email.split("@", 1)[0]
+            ).strip("_")[:24] or "google_user"
+            username = f"{base_username}_{secrets.token_hex(4)}"
+            password_hash = generate_password_hash(secrets.token_urlsafe(48))
+
+            identity_hash = hashlib.sha256(
+                username.lower().encode("utf-8")
+            ).hexdigest()
+            registration_tx = register_user_on_chain(identity_hash)
+
+            with get_db() as db:
+                db.execute(
+                    """
+                    INSERT INTO users(
+                        user_uuid, name, email, username, password_hash,
+                        blockchain_hash, registration_tx, google_sub
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        str(uuid.uuid4()), name, email, username,
+                        password_hash, identity_hash, registration_tx,
+                        google_sub
+                    )
+                )
+                user = db.execute(
+                    "SELECT * FROM users WHERE google_sub = ?",
+                    (google_sub,)
+                ).fetchone()
+
+        if user is None:
+            raise RuntimeError("Google account could not be loaded.")
+
+        establish_user_session(user)
+        flash("You are signed in with your Google account.", "success")
+        return redirect(url_for("dashboard"))
+
+    except Exception:
+        logger.exception("Google OAuth callback failed.")
+        flash(
+            "Google sign-in could not be completed. Check OAuth settings "
+            "and the application logs.",
+            "danger"
+        )
+        return redirect(url_for("login"))
 
 
 @app.route("/logout")

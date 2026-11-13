@@ -243,7 +243,6 @@
 
         <div class="auth-info">
             <div class="eyebrow">MEDICHAIN HEALTH PORTAL</div>
-
             <div class="auth-emblem">✚</div>
 
             <h1>
@@ -268,10 +267,9 @@
         </div>
 
         <div class="auth-card">
-
             <div class="eyebrow">
                 {% if current_page == 'register' %}
-                CREATE ACCOUNT
+                SECURE ACCOUNT CREATION
                 {% else %}
                 SECURE SIGN IN
                 {% endif %}
@@ -281,65 +279,31 @@
                 {% if current_page == 'register' %}
                 Join MediChain
                 {% else %}
-                Sign in
+                Sign in to MediChain
                 {% endif %}
             </h2>
 
             <p>
                 {% if current_page == 'register' %}
-                Enter your details to get started.
+                Create your account securely using your Google account.
                 {% else %}
-                Access your personal health dashboard.
+                Continue with the Google account linked to your MediChain profile.
                 {% endif %}
             </p>
 
-            <form method="POST" action="{{ url_for(current_page) }}" class="auth-form">
-
-                {% if current_page == 'register' %}
-
-                <label>
-                    Full name
-                    <input type="text" name="name" required autocomplete="name" placeholder="Your full name">
-                </label>
-
-                <label>
-                    Email address
-                    <input type="email" name="email" required autocomplete="email" placeholder="name@example.com">
-                </label>
-
-                {% endif %}
-
-                <label>
-                    Username
-                    <input type="text" name="username" required autocomplete="username" placeholder="Your username">
-                </label>
-
-                <label>
-                    Password
-                    <input type="password" name="password" required minlength="8"
-                        autocomplete="{% if current_page == 'register' %}new-password{% else %}current-password{% endif %}"
-                        placeholder="Enter password">
-                </label>
-
-                <button type="submit" class="btn btn-primary full">
-                    {% if current_page == 'register' %}
-                    Create account →
-                    {% else %}
-                    Sign in →
-                    {% endif %}
-                </button>
-            </form>
+            <a href="{{ url_for('google_login') }}" class="google-signin-btn">
+                <svg class="google-signin-icon" viewBox="0 0 48 48" aria-hidden="true">
+                    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.91c-.58 2.96-2.26 5.48-4.73 7.18l7.64 5.93c4.46-4.12 7.16-10.18 7.16-17.58z"/>
+                    <path fill="#FBBC05" d="M10.54 28.59A14.4 14.4 0 0 1 9.75 24c0-1.59.27-3.13.76-4.59l-7.98-6.19A23.9 23.9 0 0 0 0 24c0 3.87.93 7.52 2.56 10.78l7.98-6.19z"/>
+                    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.91-5.87l-7.64-5.93c-2.12 1.42-4.84 2.26-8.27 2.26-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                </svg>
+                <span>Continue with Google</span>
+            </a>
 
             <div class="auth-switch">
-                {% if current_page == 'register' %}
-                Already registered?
-                <a href="{{ url_for('login') }}">Sign in</a>
-                {% else %}
-                Don't have an account?
-                <a href="{{ url_for('register') }}">Create one</a>
-                {% endif %}
+                Your verified Google email is used to create or access your account.
             </div>
-
         </div>
     </section>
 
